@@ -10,8 +10,11 @@ uint64
 sys_exit(void)
 {
   int n;
-  argint(0, &n);
-  exit(n);
+  char msg[32];
+  argint(0, &n); // Fetch the first argument (exit status)
+  argstr(1, msg, sizeof(msg)); // Roy changed, Fetch the second argument (exit message)
+  exit(n, msg); // Call the kernel function
+  
   return 0;  // not reached
 }
 
@@ -31,8 +34,10 @@ uint64
 sys_wait(void)
 {
   uint64 p;
+  uint64 msg_p; // Tomer changed
   argaddr(0, &p);
-  return wait(p);
+  argaddr(1, &msg_p); // Tomer changed
+  return wait(p, msg_p);
 }
 
 uint64
@@ -88,4 +93,14 @@ sys_uptime(void)
   xticks = ticks;
   release(&tickslock);
   return xticks;
+}
+
+uint64
+sys_memsize(void)
+{
+  int size  = myproc()->sz;
+  if (size < 1){
+    return -1;
+  }
+  return size;
 }
