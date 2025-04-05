@@ -325,6 +325,93 @@ fork(void)
   return pid;
 }
 
+// Calls fork for n children, returns 0 for the parent process.
+int forkn(int n, int* pids) 
+{
+  if( n < 1 || n > 16) {
+    printf("Error: Can't fork a negative number of process / more than 16 processes. \n");
+    return -1;
+  }
+  struct proc *p = myproc(); // Parent process
+  struct proc *children[n]; // New child procs
+  int ker_pids[n];
+  int created = 0;
+
+  for(int i = 1; i <= n; i++) {
+    struct proc *np;
+
+    if((np = allocproc()) == 0){
+      procs_cleanup(created, children);
+      printf("Error: Failed to allocate proc number %d. \n", i);
+      return -1;
+    }
+
+    // Copy user memory from parent to child.
+    if(uvmcopy(p->pagetable, np->pagetable, p->sz) < 0){
+      freeproc(np); //to free the current procs
+      release(&np->lock);
+      // Free all previously created processes
+      procs_cleanup(created, children);
+      printf("Error: Failed to copy memory for proc number %d. \n", i);
+      return -1;
+    }
+
+    np->sz = p->sz;
+    *(np->trapframe) = *(p->trapframe);
+    // Cause fork to return the process number in the child, not ID.
+    np->trapframe->a0 = i;
+
+
+    // increment reference counts on open file descriptors.
+    for(int j = 0; j < NOFILE; j++)
+      if(p->ofile[j]){
+        np->ofile[j] = filedup(p->ofile[j]);
+      }
+    np->cwd = idup(p->cwd);
+
+    safestrcpy(np->name, p->name, sizeof(p->name));
+    
+    
+    // assign child process id to the array.
+    ker_pids[created] = np->pid;
+    children[created] = np;
+    created++;
+
+    release(&np->lock);
+
+    acquire(&wait_lock);
+    np->parent = p;
+    release(&wait_lock);
+  } // end for
+  
+  // Changing states for all child processes into RUNNABLE.
+  for (int i = 0 ; i < n; i++){ 
+    struct proc *np = children[i];
+    acquire(&np->lock);
+    np->state = RUNNABLE;
+    release(&np->lock);
+  }
+
+// Copy the pids array to the user-space array
+if (copyout(p->pagetable, pids, (char *)ker_pids, sizeof(children)) < 0) {
+  procs_cleanup(created, children);
+  printf("Error: Failed to copy pids to user space.\n");
+  return -1;
+}
+
+  printf("Parent created succesfully %d children.\n", n);
+  return 0;
+}
+
+void procs_cleanup(int numToClean, struct proc **children){
+  for (int i = 0; i < numToClean; i++){
+    struct proc *np = children[i];
+    freeproc(np);
+    release(&np->lock);
+    children[i] = 0; // Clean the array entry
+  } 
+}
+
 // Pass p's abandoned children to init.
 // Caller must hold wait_lock.
 void
@@ -435,6 +522,28 @@ wait(uint64 addr, uint64 msg_addr)
     
     // Wait for a child to exit.
     sleep(p, &wait_lock);  //DOC: wait-sleep
+  }
+}
+
+int waitall(int* n, int* statuses){
+  
+  struct proc *child_proc;
+  struct proc *p = myproc();
+  int child_num;
+
+  acquire(&wait_lock);
+
+  for(;;){
+    
+    //we need to add copyout for each child proc and for the parent proc for all 
+    
+    // No point waiting if we don't have any children.
+    if(!child_num || killed(p)){
+      release(&wait_lock);
+      return -1;
+    }
+    // Wait for a child to exit.
+    sleep(p, &wait_lock);  //DOC: wait-sleep //to check if compatible
   }
 }
 

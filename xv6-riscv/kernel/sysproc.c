@@ -31,6 +31,16 @@ sys_fork(void)
 }
 
 uint64
+sys_forkn(void)
+{
+  uint64 n;
+  uint64 pids;
+  argint(0, &n);
+  argint(1, &pids);
+  return forkn(n, pids);
+}
+
+uint64
 sys_wait(void)
 {
   uint64 p;
@@ -39,6 +49,17 @@ sys_wait(void)
   argaddr(1, &msg_p); // Tomer changed
   return wait(p, msg_p);
 }
+
+uint64
+sys_waitall(void)
+{
+  uint64 n;
+  uint64 statuses;
+  argint(0, &n);
+  argint(1, &statuses);
+  return waitall(n, statuses);
+}
+
 
 uint64
 sys_sbrk(void)
