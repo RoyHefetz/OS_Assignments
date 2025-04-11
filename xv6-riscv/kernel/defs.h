@@ -83,9 +83,9 @@ void            printfinit(void);
 
 // proc.c
 int             cpuid(void);
-void            exit(int, char*); // Tomer changed it
+void            exit(int, char*);
 int             fork(void);
-int             forkn(int, int*); // Roy change
+int             forkn(int, uint64);
 int             growproc(int);
 void            proc_mapstacks(pagetable_t);
 pagetable_t     proc_pagetable(struct proc *);
@@ -101,8 +101,8 @@ void            scheduler(void) __attribute__((noreturn));
 void            sched(void);
 void            sleep(void*, struct spinlock*);
 void            userinit(void);
-int             wait(uint64, uint64); // Roy changed it
-int             waitall(int*, int*); // Roy change
+int             wait(uint64, uint64); 
+int             waitall(uint64, uint64); 
 void            wakeup(void*);
 void            yield(void);
 int             either_copyout(int user_dst, uint64 dst, void *src, uint64 len);

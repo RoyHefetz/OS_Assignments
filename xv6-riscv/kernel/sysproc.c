@@ -12,7 +12,7 @@ sys_exit(void)
   int n;
   char msg[32];
   argint(0, &n); // Fetch the first argument (exit status)
-  argstr(1, msg, sizeof(msg)); // Roy changed, Fetch the second argument (exit message)
+  argstr(1, msg, sizeof(msg)); // Fetch the second argument (exit message)
   exit(n, msg); // Call the kernel function
   
   return 0;  // not reached
@@ -33,10 +33,10 @@ sys_fork(void)
 uint64
 sys_forkn(void)
 {
-  uint64 n;
+  int n;
   uint64 pids;
   argint(0, &n);
-  argint(1, &pids);
+  argaddr(1, &pids);
   return forkn(n, pids);
 }
 
@@ -44,9 +44,9 @@ uint64
 sys_wait(void)
 {
   uint64 p;
-  uint64 msg_p; // Tomer changed
+  uint64 msg_p;
   argaddr(0, &p);
-  argaddr(1, &msg_p); // Tomer changed
+  argaddr(1, &msg_p);
   return wait(p, msg_p);
 }
 
@@ -55,8 +55,8 @@ sys_waitall(void)
 {
   uint64 n;
   uint64 statuses;
-  argint(0, &n);
-  argint(1, &statuses);
+  argaddr(0, &n);
+  argaddr(1, &statuses);
   return waitall(n, statuses);
 }
 

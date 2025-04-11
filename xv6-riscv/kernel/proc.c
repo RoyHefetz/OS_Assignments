@@ -325,8 +325,17 @@ fork(void)
   return pid;
 }
 
+void procs_cleanup(int numToClean, struct proc **children){
+  for (int i = 0; i < numToClean; i++){
+    struct proc *np = children[i];
+    freeproc(np);
+    release(&np->lock);
+    children[i] = 0; // Clean the array entry
+  } 
+}
+
 // Calls fork for n children, returns 0 for the parent process.
-int forkn(int n, int* pids) 
+int forkn(int n, uint64 pids) 
 {
   if( n < 1 || n > 16) {
     printf("Error: Can't fork a negative number of process / more than 16 processes. \n");
@@ -393,7 +402,7 @@ int forkn(int n, int* pids)
   }
 
 // Copy the pids array to the user-space array
-if (copyout(p->pagetable, pids, (char *)ker_pids, sizeof(children)) < 0) {
+if (copyout(p->pagetable, (uint64)pids, (char *)ker_pids, sizeof(children)) < 0) {
   procs_cleanup(created, children);
   printf("Error: Failed to copy pids to user space.\n");
   return -1;
@@ -401,15 +410,6 @@ if (copyout(p->pagetable, pids, (char *)ker_pids, sizeof(children)) < 0) {
 
   printf("Parent created succesfully %d children.\n", n);
   return 0;
-}
-
-void procs_cleanup(int numToClean, struct proc **children){
-  for (int i = 0; i < numToClean; i++){
-    struct proc *np = children[i];
-    freeproc(np);
-    release(&np->lock);
-    children[i] = 0; // Clean the array entry
-  } 
 }
 
 // Pass p's abandoned children to init.
@@ -463,7 +463,7 @@ exit(int status, char* msg)
   acquire(&p->lock);
 
   p->xstate = status;
-  strncpy(p->exit_msg, msg, sizeof(p->exit_msg)); //Roy changed
+  strncpy(p->exit_msg, msg, sizeof(p->exit_msg)); 
   p->exit_msg[sizeof(p->exit_msg) - 1] = '\0'; // Ensure null-termination
   p->state = ZOMBIE;
 
@@ -497,7 +497,7 @@ wait(uint64 addr, uint64 msg_addr)
         if(pp->state == ZOMBIE){
           // Found one.
           pid = pp->pid;
-          if((addr != 0 && copyout(p->pagetable, addr, (char *)&pp->xstate, //Roy changed
+          if((addr != 0 && copyout(p->pagetable, addr, (char *)&pp->xstate,
                           sizeof(pp->xstate)) < 0) ||
                           (msg_addr != 0 && copyout(p->pagetable, msg_addr, (char *)&pp->exit_msg,
                           sizeof(pp->exit_msg)) < 0)) {
@@ -525,23 +525,54 @@ wait(uint64 addr, uint64 msg_addr)
   }
 }
 
-int waitall(int* n, int* statuses){
+int waitall(uint64 n, uint64 statuses){
   
   struct proc *child_proc;
   struct proc *p = myproc();
-  int child_num;
+  int child_num = 0;
+  int childs_stats[NPROC];
+  int has_non_zombie_child; // Acts as bool
 
   acquire(&wait_lock);
 
   for(;;){
-    
-    //we need to add copyout for each child proc and for the parent proc for all 
-    
+
+    has_non_zombie_child = 0; // Initialize to false
+
+    for(child_proc = proc; child_proc < &proc[NPROC]; child_proc++){
+      
+      if(child_proc->parent == p){
+        // make sure the child isn't still in exit() or swtch().
+        acquire(&child_proc->lock);
+
+        if(child_proc->state == ZOMBIE) {
+          child_num++;
+          childs_stats[child_num - 1] = child_proc->xstate; // exit status
+          freeproc(child_proc);
+        }
+        else {
+          has_non_zombie_child = 1; // true
+        }
+        release(&child_proc->lock);
+      }
+    }
+
+    if(!has_non_zombie_child){ // all child procceses have finished
+      if(copyout(p->pagetable, n, (char *)&child_num, sizeof(child_num)) < 0
+       ||copyout(p->pagetable, statuses, (char *)childs_stats, sizeof(childs_stats)) < 0){
+        release(&wait_lock);
+        return -1;
+       }
+       release(&wait_lock);
+       return 0;
+    }
+
     // No point waiting if we don't have any children.
-    if(!child_num || killed(p)){
+    if(killed(p)){
       release(&wait_lock);
       return -1;
     }
+    
     // Wait for a child to exit.
     sleep(p, &wait_lock);  //DOC: wait-sleep //to check if compatible
   }

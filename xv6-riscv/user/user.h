@@ -2,10 +2,10 @@ struct stat;
 
 // system calls
 int fork(void);
-int forkn(int, int*); // Tomer change 
-int exit(int, char*) __attribute__((noreturn)); // Tomer changed it
-int wait(int*, int*); //Tomer changed
-int waitall(int*, int*); // Tomer change
+int forkn(int, int*); 
+int exit(int, char*) __attribute__((noreturn));
+int wait(int*, int*);
+int waitall(int*, int*);
 int pipe(int*);
 int write(int, const void*, int);
 int read(int, void*, int);

@@ -16,8 +16,10 @@ sub entry {
 }
 	
 entry("fork");
+entry("forkn");
 entry("exit");
 entry("wait");
+entry("waitall");
 entry("pipe");
 entry("read");
 entry("write");
